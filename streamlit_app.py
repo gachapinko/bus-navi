@@ -92,10 +92,12 @@ day_type = st.radio("", ["平日", "土曜", "休日"], index=day_idx, horizonta
 
 main_tab1, main_tab2, main_tab3 = st.tabs(["🏠 ➡ 🏫 塾へ", "🏫 ➡ 🏠 帰り", "📋 時刻表"])
 
-# 全タブ共通のデフォルト時刻（今現在の時間 7-22時）
+# --- デフォルト時刻の修正 ---
 now_h = datetime.now().hour
 HOUR_CHOICES = list(range(7, 23))
-default_h_idx = HOUR_CHOICES.index(max(7, min(22, now_h)))
+# 現在時刻が 7-22時 の間ならその時間を、そうでなければ7時か22時をセット
+target_default_h = max(7, min(22, now_h))
+default_h_idx = HOUR_CHOICES.index(target_default_h)
 
 with main_tab1:
     st.write("**📍 塾に何時までに着きたい？**")
@@ -111,7 +113,6 @@ with main_tab1:
             st.info(f"🚌 バス: {bus_time}\n\n🏫 到着: {(bus + timedelta(minutes=TOTAL_BUS_TO_SCHOOL)).strftime('%H:%M')}")
             
             st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
-            # デザインを統一したコピーボタン
             copy_button_html(f"{leave_time} に出発！\\nバス: {bus_time}", "コピー")
 
 with main_tab2:
@@ -129,7 +130,6 @@ with main_tab2:
             st.info(f"🏠 家到着: {(bus + timedelta(minutes=25)).strftime('%H:%M')}")
             
             st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
-            # デザインを統一したコピーボタン
             copy_button_html(f"{bus_time} のバス\\n{pick_time} にお迎え！", "コピー")
 
 with main_tab3:
