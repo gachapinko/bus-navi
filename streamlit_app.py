@@ -29,23 +29,20 @@ BUS_DATA = {
 WALK_HOME_TO_STOP = 10
 TOTAL_BUS_TO_SCHOOL = 30 
 
-# --- セッション情報の初期化 ---
-if "bus_offset_行き" not in st.session_state: st.session_state.bus_offset_行き = 0
-if "bus_offset_帰り" not in st.session_state: st.session_state.bus_offset_帰り = 0
+if "off_行き" not in st.session_state: st.session_state.off_行き = 0
+if "off_帰り" not in st.session_state: st.session_state.off_帰り = 0
 
-# --- デザインを統一したコピーボタン ---
 def copy_button_html(text, label):
     html_code = f"""
     <div style="margin-top: -14px; margin-bottom: 10px;">
         <button onclick="copyToClipboard()" style="
-            width: 100%; height: 38.4px; background-color: rgb(255, 255, 255);
+            width: 100%; height: 38.4px; background-color: white;
             border: 1px solid rgba(49, 51, 63, 0.2); color: rgb(49, 51, 63);
             border-radius: 8px; cursor: pointer; font-size: 16px;
             font-family: 'Source Sans Pro', sans-serif; display: flex;
-            align-items: center; justify-content: center; gap: 10px; line-height: 1.6;
-            outline: none;
+            align-items: center; justify-content: center; gap: 10px;
         ">
-            <span style="font-size: 18px;">📋</span> {label}
+            <span>📋</span> {label}
         </button>
     </div>
     <script>
@@ -109,25 +106,29 @@ with main_tab1:
     h1 = c1.selectbox("時", HOUR_CHOICES, index=default_h_idx, key="h1")
     m1 = c2.selectbox("分", range(0, 60, 5), index=0, key="m1")
     
-    # 【修正】3カラムで横並びに
-    btn_c1, btn_c2, btn_c3 = st.columns(3)
-    if btn_c1.button("⬅️ 前", key="p1", use_container_width=True): st.session_state.bus_offset_行き -= 1
-    if btn_c2.button("リセット", key="r1", use_container_width=True): st.session_state.bus_offset_行き = 0
-    if btn_c3.button("次 ➡️", key="n1", use_container_width=True): st.session_state.bus_offset_行き += 1
+    # 手書き指示通りのレイアウト
+    row1_c1, row1_c2 = st.columns(2)
+    if row1_c1.button("⬅️ 前", key="p1", use_container_width=True): st.session_state.off_行き -= 1
+    if row1_c2.button("次 ➡️", key="n1", use_container_width=True): st.session_state.off_行き += 1
+    
+    _, row2_c2, _ = st.columns([1, 2, 1])
+    if row2_c2.button("リセット", key="r1", use_container_width=True): st.session_state.off_行き = 0
 
-    bus = get_offset_bus(BUS_DATA[day_type]["行き"], h1, m1, True, st.session_state.bus_offset_行き)
+    bus = get_offset_bus(BUS_DATA[day_type]["行き"], h1, m1, True, st.session_state.off_行き)
     if bus:
         leave_time = (bus - timedelta(minutes=WALK_HOME_TO_STOP)).strftime('%H:%M')
         bus_time = bus.strftime('%H:%M')
+        arr_time = (bus + timedelta(minutes=TOTAL_BUS_TO_SCHOOL)).strftime('%H:%M')
+        
         st.success(f"🏠 **{leave_time}** に出発！")
         
-        info_label = f"🚌 バス: {bus_time}"
-        if st.session_state.bus_offset_行き != 0:
-            info_label += f" ({'前' if st.session_state.bus_offset_行き < 0 else '次'}のバス表示中)"
-        st.info(info_label)
+        info_txt = f"🚌 バス: {bus_time}\n\n🏫 到着: {arr_time}"
+        if st.session_state.off_行き != 0:
+            info_txt += f"\n\n({'前のバス' if st.session_state.off_行き < 0 else '次のバス'}を表示中)"
+        st.info(info_txt)
 
         st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
-        copy_button_html(f"{leave_time} に出発！\\nバス: {bus_time}", "コピー")
+        copy_button_html(f"{leave_time} 出発！\\nバス: {bus_time}", "コピー")
 
 with main_tab2:
     st.write("**📍 塾を何時に出る？**")
@@ -135,25 +136,26 @@ with main_tab2:
     h2 = c1.selectbox("時", HOUR_CHOICES, index=default_h_idx, key="h2")
     m2 = c2.selectbox("分", range(0, 60, 5), index=0, key="m2")
     
-    # 【修正】3カラムで横並びに
-    btn2_c1, btn2_c2, btn2_c3 = st.columns(3)
-    if btn2_c1.button("⬅️ 前", key="p2", use_container_width=True): st.session_state.bus_offset_帰り -= 1
-    if btn2_c2.button("リセット", key="r2", use_container_width=True): st.session_state.bus_offset_帰り = 0
-    if btn2_c3.button("次 ➡️", key="n2", use_container_width=True): st.session_state.bus_offset_帰り += 1
+    row1_c1, row1_c2 = st.columns(2)
+    if row1_c1.button("⬅️ 前", key="p2", use_container_width=True): st.session_state.off_帰り -= 1
+    if row1_c2.button("次 ➡️", key="n2", use_container_width=True): st.session_state.off_帰り += 1
+    
+    _, row2_c2, _ = st.columns([1, 2, 1])
+    if row2_c2.button("リセット", key="r2", use_container_width=True): st.session_state.off_帰り = 0
 
-    bus = get_offset_bus(BUS_DATA[day_type]["帰り"], h2, m2, False, st.session_state.bus_offset_帰り)
+    bus = get_offset_bus(BUS_DATA[day_type]["帰り"], h2, m2, False, st.session_state.off_帰り)
     if bus:
         bus_time = bus.strftime('%H:%M')
         pick_time = (bus + timedelta(minutes=15)).strftime('%H:%M')
         st.success(f"🚌 **{bus_time}** のバス")
         
-        warn_label = f"🏃 **{pick_time}** にお迎え！"
-        if st.session_state.bus_offset_帰り != 0:
-            warn_label += f" ({'前' if st.session_state.bus_offset_帰り < 0 else '次'}のバス表示中)"
-        st.warning(warn_label)
+        warn_txt = f"🏃 **{pick_time}** にお迎え！"
+        if st.session_state.off_帰り != 0:
+            warn_txt += f" ({'前' if st.session_state.off_帰り < 0 else '次'}のバス)"
+        st.warning(warn_txt)
         
         st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
-        copy_button_html(f"{bus_time} のバス\\n{pick_time} にお迎え！", "コピー")
+        copy_button_html(f"{bus_time} バス\\n{pick_time} お迎え", "コピー")
 
 with main_tab3:
     def create_combined_timetable(direction):
