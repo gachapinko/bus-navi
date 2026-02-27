@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
+import urllib.parse
 
 # --- サイト設定 ---
 st.set_page_config(page_title="バスナビゲーター", page_icon="🚌", layout="centered")
@@ -23,6 +24,15 @@ BUS_DATA = {
 
 WALK_HOME_TO_STOP = 10
 TOTAL_BUS_TO_SCHOOL = 30 
+
+# --- Google タスク自動入力リンク作成関数 ---
+def get_google_task_link(title, dt):
+    base_url = "https://calendar.google.com/calendar/render?action=TEMPLATE"
+    text = urllib.parse.quote(title)
+    # yyyymmddThhmmss 形式
+    date_str = dt.strftime("%Y%m%dT%H%M%S")
+    # type=TASK をつけることで、カレンダーではなくタスクとして開きやすくする
+    return f"{base_url}&text={text}&dates={date_str}/{date_str}"
 
 def get_best_bus(direction_data, target_h, target_m, is_arrival_limit=True):
     target_dt = datetime(2026, 1, 1, target_h, target_m)
@@ -67,12 +77,14 @@ with main_tab1:
     if st.button("出発時間を計算", key="btn1", use_container_width=True):
         bus = get_best_bus(BUS_DATA[day_type]["行き"], h1, m1, True)
         if bus:
-            leave_home = (bus - timedelta(minutes=WALK_HOME_TO_STOP)).strftime('%H:%M')
-            st.success(f"🏠 **{leave_home}** に出発！")
+            leave_dt = bus - timedelta(minutes=WALK_HOME_TO_STOP)
+            leave_str = leave_dt.strftime('%H:%M')
+            st.success(f"🏠 **{leave_str}** に出発！")
             st.info(f"🚌 バス: {bus.strftime('%H:%M')}\n\n🏫 到着: {(bus + timedelta(minutes=TOTAL_BUS_TO_SCHOOL)).strftime('%H:%M')}")
             
-            # Google Tasks一本に絞る
-            st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
+            # 自動入力リンク
+            task_title = f"{leave_str} 塾へ出発"
+            st.link_button("💙 Google Tasks に追加", get_google_task_link(task_title, leave_dt), use_container_width=True)
 
 with main_tab2:
     st.write("**📍 塾を何時に出る？**")
@@ -81,14 +93,15 @@ with main_tab2:
     if st.button("帰りのバスを計算", key="btn2", use_container_width=True):
         bus = get_best_bus(BUS_DATA[day_type]["帰り"], h2, m2, False)
         if bus:
-            pickup_time = (bus + timedelta(minutes=15)).strftime('%H:%M')
-            reach_home = (bus + timedelta(minutes=25)).strftime('%H:%M')
+            pick_dt = bus + timedelta(minutes=15)
+            pick_str = pick_dt.strftime('%H:%M')
             st.success(f"🚌 **{bus.strftime('%H:%M')}** のバス")
-            st.warning(f"🏃 **{pickup_time}** にお迎え！")
-            st.info(f"🏠 家到着: {reach_home}")
+            st.warning(f"🏃 **{pick_str}** にお迎え！")
+            st.info(f"🏠 家到着: {(bus + timedelta(minutes=25)).strftime('%H:%M')}")
 
-            # Google Tasks一本に絞る
-            st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
+            # 自動入力リンク
+            task_title = f"{pick_str} バスお迎え"
+            st.link_button("💙 Google Tasks に追加", get_google_task_link(task_title, pick_dt), use_container_width=True)
 
 with main_tab3:
     sub_tab1, sub_tab2 = st.tabs(["🏫 行き", "🏠 帰り"])
