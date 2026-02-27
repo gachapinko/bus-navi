@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-import urllib.parse
+import streamlit.components.v1 as components
 
 # --- サイト設定 ---
 st.set_page_config(page_title="バスナビゲーター", page_icon="🚌", layout="centered")
@@ -25,19 +25,55 @@ BUS_DATA = {
 WALK_HOME_TO_STOP = 10
 TOTAL_BUS_TO_SCHOOL = 30 
 
-# --- Google タスク自動入力リンク作成関数 ---
-def get_google_task_link(title, dt):
-    base_url = "https://calendar.google.com/calendar/render?action=TEMPLATE"
-    text = urllib.parse.quote(title)
-    # yyyymmddThhmmss 形式
-    date_str = dt.strftime("%Y%m%dT%H%M%S")
-    # type=TASK をつけることで、カレンダーではなくタスクとして開きやすくする
-    return f"{base_url}&text={text}&dates={date_str}/{date_str}"
+# --- デザインを完全に標準ボタンと一致させたコピーボタン ---
+def copy_button_html(text, label):
+    html_code = f"""
+    <div style="margin-top: -14px; margin-bottom: 10px;">
+        <button onclick="copyToClipboard()" style="
+            width: 100%;
+            height: 38.4px;
+            background-color: rgb(255, 255, 255);
+            border: 1px solid rgba(49, 51, 63, 0.2);
+            color: rgb(49, 51, 63);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-family: 'Source Sans Pro', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            line-height: 1.6;
+            outline: none;
+        ">
+            <span style="font-size: 18px;">📋</span> {label}
+        </button>
+    </div>
+
+    <script>
+    function copyToClipboard() {{
+        const text = `{text}`;
+        const tempTextArea = document.createElement("textarea");
+        tempTextArea.value = text;
+        document.body.appendChild(tempTextArea);
+        tempTextArea.select();
+        try {{
+            document.execCommand('copy');
+            alert('コピーしました！');
+        }} catch (err) {{
+            console.error('fallback copy failed', err);
+        }}
+        document.body.removeChild(tempTextArea);
+    }}
+    </script>
+    """
+    return components.html(html_code, height=50)
 
 def get_best_bus(direction_data, target_h, target_m, is_arrival_limit=True):
-    target_dt = datetime(2026, 1, 1, target_h, target_m)
+    now = datetime.now()
+    target_dt = now.replace(hour=target_h, minute=target_m, second=0, microsecond=0)
     deadline = target_dt - timedelta(minutes=TOTAL_BUS_TO_SCHOOL) if is_arrival_limit else target_dt
-    all_buses = [datetime(2026, 1, 1, h, m) for h, mins in direction_data.items() for m in mins]
+    all_buses = [now.replace(hour=h, minute=m, second=0, microsecond=0) for h, mins in direction_data.items() for m in mins]
     all_buses.sort()
     if is_arrival_limit:
         suitable = [b for b in all_buses if b <= deadline]
@@ -46,66 +82,66 @@ def get_best_bus(direction_data, target_h, target_m, is_arrival_limit=True):
         suitable = [b for b in all_buses if b >= deadline]
         return suitable[0] if suitable else None
 
-def create_combined_timetable(direction):
-    hours = range(7, 23)
-    data = []
-    for h in hours:
-        row = {"時": h}
-        for day in ["平日", "土曜", "休日"]:
-            mins = BUS_DATA[day][direction].get(h, [])
-            row[day] = " ".join([f"{m:02d}" for m in mins])
-        data.append(row)
-    return pd.DataFrame(data).set_index("時")
-
 # --- UI ---
 st.subheader("🚌 バスナビゲーター")
 
+# 曜日のデフォルト設定
 wd = datetime.now().weekday()
-default_idx = 0 if wd < 5 else 1 if wd == 5 else 2
-day_type = st.radio("", ["平日", "土曜", "休日"], index=default_idx, horizontal=True)
+day_idx = 0 if wd < 5 else 1 if wd == 5 else 2
+day_type = st.radio("", ["平日", "土曜", "休日"], index=day_idx, horizontal=True)
 
 main_tab1, main_tab2, main_tab3 = st.tabs(["🏠 ➡ 🏫 塾へ", "🏫 ➡ 🏠 帰り", "📋 時刻表"])
 
-now = datetime.now()
+# 全タブ共通のデフォルト時刻（今現在の時間 7-22時）
+now_h = datetime.now().hour
 HOUR_CHOICES = list(range(7, 23))
-current_h_idx = HOUR_CHOICES.index(now.hour) if now.hour in HOUR_CHOICES else 0
+default_h_idx = HOUR_CHOICES.index(max(7, min(22, now_h)))
 
 with main_tab1:
     st.write("**📍 塾に何時までに着きたい？**")
     c1, c2 = st.columns(2)
-    h1, m1 = c1.selectbox("時", HOUR_CHOICES, index=current_h_idx, key="h1"), c2.selectbox("分", range(0, 60, 5), index=0, key="m1")
+    h1 = c1.selectbox("時", HOUR_CHOICES, index=default_h_idx, key="h1")
+    m1 = c2.selectbox("分", range(0, 60, 5), index=0, key="m1")
     if st.button("出発時間を計算", key="btn1", use_container_width=True):
         bus = get_best_bus(BUS_DATA[day_type]["行き"], h1, m1, True)
         if bus:
-            leave_dt = bus - timedelta(minutes=WALK_HOME_TO_STOP)
-            leave_str = leave_dt.strftime('%H:%M')
-            st.success(f"🏠 **{leave_str}** に出発！")
-            st.info(f"🚌 バス: {bus.strftime('%H:%M')}\n\n🏫 到着: {(bus + timedelta(minutes=TOTAL_BUS_TO_SCHOOL)).strftime('%H:%M')}")
+            leave_time = (bus - timedelta(minutes=WALK_HOME_TO_STOP)).strftime('%H:%M')
+            bus_time = bus.strftime('%H:%M')
+            st.success(f"🏠 **{leave_time}** に出発！")
+            st.info(f"🚌 バス: {bus_time}\n\n🏫 到着: {(bus + timedelta(minutes=TOTAL_BUS_TO_SCHOOL)).strftime('%H:%M')}")
             
-            # 自動入力リンク
-            task_title = f"{leave_str} 塾へ出発"
-            st.link_button("💙 Google Tasks に追加", get_google_task_link(task_title, leave_dt), use_container_width=True)
+            st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
+            # デザインを統一したコピーボタン
+            copy_button_html(f"{leave_time} に出発！\\nバス: {bus_time}", "コピー")
 
 with main_tab2:
     st.write("**📍 塾を何時に出る？**")
     c1, c2 = st.columns(2)
-    h2, m2 = c1.selectbox("時", HOUR_CHOICES, index=current_h_idx, key="h2"), c2.selectbox("分", range(0, 60, 5), index=0, key="m2")
+    h2 = c1.selectbox("時", HOUR_CHOICES, index=default_h_idx, key="h2")
+    m2 = c2.selectbox("分", range(0, 60, 5), index=0, key="m2")
     if st.button("帰りのバスを計算", key="btn2", use_container_width=True):
         bus = get_best_bus(BUS_DATA[day_type]["帰り"], h2, m2, False)
         if bus:
-            pick_dt = bus + timedelta(minutes=15)
-            pick_str = pick_dt.strftime('%H:%M')
-            st.success(f"🚌 **{bus.strftime('%H:%M')}** のバス")
-            st.warning(f"🏃 **{pick_str}** にお迎え！")
+            bus_time = bus.strftime('%H:%M')
+            pick_time = (bus + timedelta(minutes=15)).strftime('%H:%M')
+            st.success(f"🚌 **{bus_time}** のバス")
+            st.warning(f"🏃 **{pick_time}** にお迎え！")
             st.info(f"🏠 家到着: {(bus + timedelta(minutes=25)).strftime('%H:%M')}")
-
-            # 自動入力リンク
-            task_title = f"{pick_str} バスお迎え"
-            st.link_button("💙 Google Tasks に追加", get_google_task_link(task_title, pick_dt), use_container_width=True)
+            
+            st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
+            # デザインを統一したコピーボタン
+            copy_button_html(f"{bus_time} のバス\\n{pick_time} にお迎え！", "コピー")
 
 with main_tab3:
+    def create_combined_timetable(direction):
+        h_range = range(7, 23)
+        table_data = []
+        for h in h_range:
+            row = {"時": h}
+            for d in ["平日", "土曜", "休日"]:
+                row[d] = " ".join([f"{m:02d}" for m in BUS_DATA[d][direction].get(h, [])])
+            table_data.append(row)
+        return pd.DataFrame(table_data).set_index("時")
     sub_tab1, sub_tab2 = st.tabs(["🏫 行き", "🏠 帰り"])
-    with sub_tab1:
-        st.table(create_combined_timetable("行き"))
-    with sub_tab2:
-        st.table(create_combined_timetable("帰り"))
+    with sub_tab1: st.table(create_combined_timetable("行き"))
+    with sub_tab2: st.table(create_combined_timetable("帰り"))
