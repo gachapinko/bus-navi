@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
+import urllib.parse
 
 # --- サイト設定 ---
 st.set_page_config(page_title="バスナビゲーター", page_icon="🚌", layout="centered")
@@ -48,7 +49,7 @@ def create_combined_timetable(direction):
     return pd.DataFrame(data).set_index("時")
 
 # --- UI ---
-st.title("🚌 バスナビゲーター")
+st.subheader("🚌 バスナビゲーター")
 
 wd = datetime.now().weekday()
 default_idx = 0 if wd < 5 else 1 if wd == 5 else 2
@@ -61,34 +62,48 @@ HOUR_CHOICES = list(range(7, 23))
 current_h_idx = HOUR_CHOICES.index(now.hour) if now.hour in HOUR_CHOICES else 0
 
 with main_tab1:
-    st.markdown("### 塾に何時までに着きたい？")
+    st.write("**📍 塾に何時までに着きたい？**")
     c1, c2 = st.columns(2)
     h1, m1 = c1.selectbox("時", HOUR_CHOICES, index=current_h_idx, key="h1"), c2.selectbox("分", range(0, 60, 5), index=0, key="m1")
     if st.button("出発時間を計算", key="btn1", use_container_width=True):
         bus = get_best_bus(BUS_DATA[day_type]["行き"], h1, m1, True)
         if bus:
-            st.success(f"🏠 **{(bus - timedelta(minutes=WALK_HOME_TO_STOP)).strftime('%H:%M')}** に家を出発！")
-            st.info(f"🚌 バスの時間: {bus.strftime('%H:%M')}\n\n🏫 塾到着予定: {(bus + timedelta(minutes=TOTAL_BUS_TO_SCHOOL)).strftime('%H:%M')}")
+            leave_home = (bus - timedelta(minutes=WALK_HOME_TO_STOP)).strftime('%H:%M')
+            st.success(f"🏠 **{leave_home}** に出発！")
+            st.info(f"🚌 バス: {bus.strftime('%H:%M')}\n\n🏫 到着: {(bus + timedelta(minutes=TOTAL_BUS_TO_SCHOOL)).strftime('%H:%M')}")
+            
+            # 直接ToDoアプリを起動する案内
+            st.markdown(f"コピー用： `{leave_home} 塾へ出発`")
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.link_button("🍎 iPhoneリマインダー", "x-apple-reminder://")
+            with col_b:
+                st.link_button("💙 Google Tasks", "https://tasks.google.com/")
 
 with main_tab2:
-    st.markdown("### 塾を何時に出る？")
+    st.write("**📍 塾を何時に出る？**")
     c1, c2 = st.columns(2)
     h2, m2 = c1.selectbox("時", HOUR_CHOICES, index=current_h_idx, key="h2"), c2.selectbox("分", range(0, 60, 5), index=0, key="m2")
     if st.button("帰りのバスを計算", key="btn2", use_container_width=True):
         bus = get_best_bus(BUS_DATA[day_type]["帰り"], h2, m2, False)
         if bus:
-            pickup_time = bus + timedelta(minutes=15)
-            reach_home = bus + timedelta(minutes=25)
+            pickup_time = (bus + timedelta(minutes=15)).strftime('%H:%M')
+            reach_home = (bus + timedelta(minutes=25)).strftime('%H:%M')
             st.success(f"🚌 **{bus.strftime('%H:%M')}** のバス")
-            st.warning(f"🏃 **{pickup_time.strftime('%H:%M')}** に家を出てお迎え！")
-            st.info(f"🏠 家に着く予定: {reach_home.strftime('%H:%M')}")
+            st.warning(f"🏃 **{pickup_time}** にお迎え！")
+            st.info(f"🏠 家到着: {reach_home}")
+
+            # 直接ToDoアプリを起動する案内
+            st.markdown(f"コピー用： `{pickup_time} バスお迎え`")
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.link_button("🍎 iPhoneリマインダー", "x-apple-reminder://")
+            with col_b:
+                st.link_button("💙 Google Tasks", "https://tasks.google.com/")
 
 with main_tab3:
-    # 時刻表内での切り替えタブ
     sub_tab1, sub_tab2 = st.tabs(["🏫 行き", "🏠 帰り"])
-    
     with sub_tab1:
         st.table(create_combined_timetable("行き"))
-        
     with sub_tab2:
         st.table(create_combined_timetable("帰り"))
