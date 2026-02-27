@@ -27,27 +27,25 @@ BUS_DATA = {
 }
 
 WALK_HOME_TO_STOP = 10
-TOTAL_BUS_TO_SCHOOL = 15
-WALK_STOP_TO_SCHOOL = 5
+TOTAL_BUS_TO_SCHOOL = 30 
 
-# --- セッション情報の管理 ---
-for key in ["bus_offset_行き", "bus_offset_帰り"]:
-    if key not in st.session_state: st.session_state[key] = 0
-for key in ["show_result_行き", "show_result_帰り"]:
-    if key not in st.session_state: st.session_state[key] = False
+# --- セッション情報の初期化 ---
+if "bus_offset_行き" not in st.session_state: st.session_state.bus_offset_行き = 0
+if "bus_offset_帰り" not in st.session_state: st.session_state.bus_offset_帰り = 0
 
-# --- コピーボタン ---
+# --- デザインを統一したコピーボタン ---
 def copy_button_html(text, label):
     html_code = f"""
     <div style="margin-top: -14px; margin-bottom: 10px;">
         <button onclick="copyToClipboard()" style="
-            width: 100%; height: 38.4px; background-color: white;
+            width: 100%; height: 38.4px; background-color: rgb(255, 255, 255);
             border: 1px solid rgba(49, 51, 63, 0.2); color: rgb(49, 51, 63);
             border-radius: 8px; cursor: pointer; font-size: 16px;
             font-family: 'Source Sans Pro', sans-serif; display: flex;
             align-items: center; justify-content: center; gap: 10px; line-height: 1.6;
+            outline: none;
         ">
-            <span>📋</span> {label}
+            <span style="font-size: 18px;">📋</span> {label}
         </button>
     </div>
     <script>
@@ -68,10 +66,7 @@ def copy_button_html(text, label):
 def get_offset_bus(direction_data, target_h, target_m, is_arrival_limit, offset):
     now = datetime.now(JST)
     target_dt = now.replace(hour=target_h, minute=target_m, second=0, microsecond=0)
-    
-    # 行き：塾到着の20分前までに出るバス / 帰り：指定時間以降に出るバス
-    deadline = target_dt - timedelta(minutes=20) if is_arrival_limit else target_dt
-    
+    deadline = target_dt - timedelta(minutes=TOTAL_BUS_TO_SCHOOL) if is_arrival_limit else target_dt
     all_buses = [now.replace(hour=h, minute=m, second=0, microsecond=0) for h, mins in direction_data.items() for m in mins]
     all_buses.sort()
     
@@ -113,56 +108,52 @@ with main_tab1:
     c1, c2 = st.columns(2)
     h1 = c1.selectbox("時", HOUR_CHOICES, index=default_h_idx, key="h1")
     m1 = c2.selectbox("分", range(0, 60, 5), index=0, key="m1")
-    if st.button("出発時間を計算", key="btn1", use_container_width=True):
-        st.session_state.show_result_行き = True
-        st.session_state.bus_offset_行き = 0
+    
+    # 【修正】3カラムで横並びに
+    btn_c1, btn_c2, btn_c3 = st.columns(3)
+    if btn_c1.button("⬅️ 前", key="p1", use_container_width=True): st.session_state.bus_offset_行き -= 1
+    if btn_c2.button("リセット", key="r1", use_container_width=True): st.session_state.bus_offset_行き = 0
+    if btn_c3.button("次 ➡️", key="n1", use_container_width=True): st.session_state.bus_offset_行き += 1
 
-    if st.session_state.show_result_行き:
-        bus = get_offset_bus(BUS_DATA[day_type]["行き"], h1, m1, True, st.session_state.bus_offset_行き)
-        if bus:
-            leave_time = (bus - timedelta(minutes=WALK_HOME_TO_STOP)).strftime('%H:%M')
-            bus_time = bus.strftime('%H:%M')
-            arrival_time = (bus + timedelta(minutes=20)).strftime('%H:%M')
-            st.success(f"🏠 **{leave_time}** に家を出る")
-            st.info(f"🚌 バス発車: **{bus_time}**\n\n🏫 塾到着予定: {arrival_time}")
-            
-            # 操作ボタン
-            col1, col2, col3 = st.columns(3)
-            if col1.button("⬅️ 前", key="p1"): st.session_state.bus_offset_行き -= 1; st.rerun()
-            if col2.button("リセット", key="r1"): st.session_state.bus_offset_行き = 0; st.rerun()
-            if col3.button("次 ➡️", key="n1"): st.session_state.bus_offset_行き += 1; st.rerun()
-            
-            st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
-            copy_button_html(f"{leave_time} 出発 / {bus_time} バス", "コピー")
+    bus = get_offset_bus(BUS_DATA[day_type]["行き"], h1, m1, True, st.session_state.bus_offset_行き)
+    if bus:
+        leave_time = (bus - timedelta(minutes=WALK_HOME_TO_STOP)).strftime('%H:%M')
+        bus_time = bus.strftime('%H:%M')
+        st.success(f"🏠 **{leave_time}** に出発！")
+        
+        info_label = f"🚌 バス: {bus_time}"
+        if st.session_state.bus_offset_行き != 0:
+            info_label += f" ({'前' if st.session_state.bus_offset_行き < 0 else '次'}のバス表示中)"
+        st.info(info_label)
+
+        st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
+        copy_button_html(f"{leave_time} に出発！\\nバス: {bus_time}", "コピー")
 
 with main_tab2:
     st.write("**📍 塾を何時に出る？**")
     c1, c2 = st.columns(2)
     h2 = c1.selectbox("時", HOUR_CHOICES, index=default_h_idx, key="h2")
     m2 = c2.selectbox("分", range(0, 60, 5), index=0, key="m2")
-    if st.button("帰りのバスを計算", key="btn2", use_container_width=True):
-        st.session_state.show_result_帰り = True
-        st.session_state.bus_offset_帰り = 0
+    
+    # 【修正】3カラムで横並びに
+    btn2_c1, btn2_c2, btn2_c3 = st.columns(3)
+    if btn2_c1.button("⬅️ 前", key="p2", use_container_width=True): st.session_state.bus_offset_帰り -= 1
+    if btn2_c2.button("リセット", key="r2", use_container_width=True): st.session_state.bus_offset_帰り = 0
+    if btn2_c3.button("次 ➡️", key="n2", use_container_width=True): st.session_state.bus_offset_帰り += 1
 
-    if st.session_state.show_result_帰り:
-        bus = get_offset_bus(BUS_DATA[day_type]["帰り"], h2, m2, False, st.session_state.bus_offset_帰り)
-        if bus:
-            bus_time = bus.strftime('%H:%M')
-            pick_time = (bus + timedelta(minutes=15)).strftime('%H:%M')
-            home_arrival = (bus + timedelta(minutes=25)).strftime('%H:%M')
-            
-            st.success(f"🚌 **{bus_time}** のバスに乗る")
-            st.warning(f"🏃 お迎え目安: **{pick_time}**")
-            st.info(f"🏠 家到着: {home_arrival}")
-
-            # 操作ボタン
-            col1, col2, col3 = st.columns(3)
-            if col1.button("⬅️ 前", key="p2"): st.session_state.bus_offset_帰り -= 1; st.rerun()
-            if col2.button("リセット", key="r2"): st.session_state.bus_offset_帰り = 0; st.rerun()
-            if col3.button("次 ➡️", key="n2"): st.session_state.bus_offset_帰り += 1; st.rerun()
-            
-            st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
-            copy_button_html(f"{bus_time} バス / {pick_time} お迎え", "コピー")
+    bus = get_offset_bus(BUS_DATA[day_type]["帰り"], h2, m2, False, st.session_state.bus_offset_帰り)
+    if bus:
+        bus_time = bus.strftime('%H:%M')
+        pick_time = (bus + timedelta(minutes=15)).strftime('%H:%M')
+        st.success(f"🚌 **{bus_time}** のバス")
+        
+        warn_label = f"🏃 **{pick_time}** にお迎え！"
+        if st.session_state.bus_offset_帰り != 0:
+            warn_label += f" ({'前' if st.session_state.bus_offset_帰り < 0 else '次'}のバス表示中)"
+        st.warning(warn_label)
+        
+        st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
+        copy_button_html(f"{bus_time} のバス\\n{pick_time} にお迎え！", "コピー")
 
 with main_tab3:
     def create_combined_timetable(direction):
