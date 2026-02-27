@@ -27,15 +27,13 @@ BUS_DATA = {
 }
 
 WALK_HOME_TO_STOP = 10
-TOTAL_BUS_TO_SCHOOL = 30 
+TOTAL_BUS_TO_SCHOOL = 30 # 片道の所要時間（バス+徒歩合計）
 
-# --- セッション初期化 ---
 if "off_行き" not in st.session_state: st.session_state.off_行き = 0
 if "off_帰り" not in st.session_state: st.session_state.off_帰り = 0
 if "show_行き" not in st.session_state: st.session_state.show_行き = False
 if "show_帰り" not in st.session_state: st.session_state.show_帰り = False
 
-# --- コピーボタン ---
 def copy_button_html(text, label):
     html_code = f"""
     <div style="margin-top: -14px; margin-bottom: 10px;">
@@ -67,8 +65,6 @@ def copy_button_html(text, label):
 def get_offset_bus(direction_data, target_h, target_m, is_arrival_limit, offset):
     now = datetime.now(JST)
     target_dt = now.replace(hour=target_h, minute=target_m, second=0, microsecond=0)
-    # 行きは「到着希望時間の30分前までにバスが出る」
-    # 帰りは「出発希望時間以降に出る」
     deadline = target_dt - timedelta(minutes=TOTAL_BUS_TO_SCHOOL) if is_arrival_limit else target_dt
     
     all_buses = [now.replace(hour=h, minute=m, second=0, microsecond=0) for h, mins in direction_data.items() for m in mins]
@@ -107,7 +103,6 @@ HOUR_CHOICES = list(range(7, 23))
 target_default_h = max(7, min(22, now_h))
 default_h_idx = HOUR_CHOICES.index(target_default_h)
 
-# --- タブ1: 行き ---
 with main_tab1:
     st.write("**📍 塾に何時までに着きたい？**")
     c1, c2 = st.columns(2)
@@ -121,27 +116,22 @@ with main_tab1:
     if st.session_state.show_行き:
         bus = get_offset_bus(BUS_DATA[day_type]["行き"], h1, m1, True, st.session_state.off_行き)
         if bus:
-            leave_time = (bus - timedelta(minutes=WALK_HOME_TO_STOP)).strftime('%H:%M')
-            bus_time = bus.strftime('%H:%M')
-            arr_time = (bus + timedelta(minutes=TOTAL_BUS_TO_SCHOOL)).strftime('%H:%M')
+            leave_t = (bus - timedelta(minutes=WALK_HOME_TO_STOP)).strftime('%H:%M')
+            bus_t = bus.strftime('%H:%M')
+            arr_t = (bus + timedelta(minutes=TOTAL_BUS_TO_SCHOOL)).strftime('%H:%M')
             
-            st.success(f"🏠 **{leave_time}** に出発！")
-            info_txt = f"🚌 バス: {bus_time}\n\n🏫 到着: {arr_time}"
-            if st.session_state.off_行き != 0:
-                info_txt += f"\n\n({'前のバス' if st.session_state.off_行き < 0 else '次のバス'}を表示中)"
-            st.info(info_txt)
+            st.success(f"🏠 **{leave_t}** に出発！")
+            st.info(f"🚌 バス: {bus_t}\n\n🏫 到着: {arr_t}" + (f"\n\n({'前のバス' if st.session_state.off_行き < 0 else '次のバス'}を表示中)" if st.session_state.off_行き != 0 else ""))
 
-            # 配置修正: 前/次ボタン
-            row1_c1, row1_c2 = st.columns(2)
-            if row1_c1.button("⬅️ 前", key="p1", use_container_width=True): st.session_state.off_行き -= 1; st.rerun()
-            if row1_c2.button("次 ➡️", key="n1", use_container_width=True): st.session_state.off_行き += 1; st.rerun()
-            _, row2_c2, _ = st.columns([1, 2, 1])
-            if row2_c2.button("リセット", key="r1", use_container_width=True): st.session_state.off_行き = 0; st.rerun()
+            r1c1, r1c2 = st.columns(2)
+            if r1c1.button("⬅️ 前", key="p1", use_container_width=True): st.session_state.off_行き -= 1; st.rerun()
+            if r1c2.button("次 ➡️", key="n1", use_container_width=True): st.session_state.off_行き += 1; st.rerun()
+            _, r2c2, _ = st.columns([1, 2, 1])
+            if r2c2.button("リセット", key="r1", use_container_width=True): st.session_state.off_行き = 0; st.rerun()
 
             st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
-            copy_button_html(f"{leave_time} 出発！\\nバス: {bus_time}", "コピー")
+            copy_button_html(f"{leave_t} 出発！\\nバス: {bus_t}", "コピー")
 
-# --- タブ2: 帰り ---
 with main_tab2:
     st.write("**📍 塾を何時に出る？**")
     c1, c2 = st.columns(2)
@@ -155,26 +145,25 @@ with main_tab2:
     if st.session_state.show_帰り:
         bus = get_offset_bus(BUS_DATA[day_type]["帰り"], h2, m2, False, st.session_state.off_帰り)
         if bus:
-            bus_time = bus.strftime('%H:%M')
-            pick_time = (bus + timedelta(minutes=15)).strftime('%H:%M') # バス到着15分後をお迎えに設定
+            bus_t = bus.strftime('%H:%M')
+            # 塾からバス停まで5分、バスで中目黒まで10分、そこからお迎えまで少しバッファ
+            # お迎えはバス到着の少し後（15分後）、帰宅は25分後
+            pick_t = (bus + timedelta(minutes=15)).strftime('%H:%M')
+            home_t = (bus + timedelta(minutes=25)).strftime('%H:%M')
             
-            st.success(f"🚌 **{bus_time}** のバス")
-            warn_txt = f"🏃 **{pick_time}** にお迎え！"
-            if st.session_state.off_帰り != 0:
-                warn_txt += f" ({'前' if st.session_state.off_帰り < 0 else '次'}のバス)"
-            st.warning(warn_txt)
+            st.success(f"🚌 **{bus_t}** のバス")
+            st.warning(f"🏃 **{pick_t}** にお迎え！")
+            st.info(f"🏠 **{home_t}** に家到着" + (f"\n\n({'前のバス' if st.session_state.off_帰り < 0 else '次のバス'}を表示中)" if st.session_state.off_帰り != 0 else ""))
             
-            # 配置修正: 前/次ボタン
-            row1_c1, row1_c2 = st.columns(2)
-            if row1_c1.button("⬅️ 前", key="p2", use_container_width=True): st.session_state.off_帰り -= 1; st.rerun()
-            if row1_c2.button("次 ➡️", key="n2", use_container_width=True): st.session_state.off_帰り += 1; st.rerun()
-            _, row2_c2, _ = st.columns([1, 2, 1])
-            if row2_c2.button("リセット", key="r2", use_container_width=True): st.session_state.off_帰り = 0; st.rerun()
+            r1c1, r1c2 = st.columns(2)
+            if r1c1.button("⬅️ 前", key="p2", use_container_width=True): st.session_state.off_帰り -= 1; st.rerun()
+            if r1c2.button("次 ➡️", key="n2", use_container_width=True): st.session_state.off_帰り += 1; st.rerun()
+            _, r2c2, _ = st.columns([1, 2, 1])
+            if r2c2.button("リセット", key="r2", use_container_width=True): st.session_state.off_帰り = 0; st.rerun()
 
             st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
-            copy_button_html(f"{bus_time} バス\\n{pick_time} お迎え", "コピー")
+            copy_button_html(f"{bus_t} バス\\n{pick_t} お迎え", "コピー")
 
-# --- タブ3: 時刻表 ---
 with main_tab3:
     def create_combined_timetable(direction):
         h_range = range(7, 23)
