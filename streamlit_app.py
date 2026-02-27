@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-import urllib.parse
 
 # --- サイト設定 ---
 st.set_page_config(page_title="バスナビゲーター", page_icon="🚌", layout="centered")
@@ -72,13 +71,8 @@ with main_tab1:
             st.success(f"🏠 **{leave_home}** に出発！")
             st.info(f"🚌 バス: {bus.strftime('%H:%M')}\n\n🏫 到着: {(bus + timedelta(minutes=TOTAL_BUS_TO_SCHOOL)).strftime('%H:%M')}")
             
-            # 直接ToDoアプリを起動する案内
-            st.markdown(f"コピー用： `{leave_home} 塾へ出発`")
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.link_button("🍎 iPhoneリマインダー", "x-apple-reminder://")
-            with col_b:
-                st.link_button("💙 Google Tasks", "https://tasks.google.com/")
+            # Google Tasks一本に絞る
+            st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
 
 with main_tab2:
     st.write("**📍 塾を何時に出る？**")
@@ -93,13 +87,8 @@ with main_tab2:
             st.warning(f"🏃 **{pickup_time}** にお迎え！")
             st.info(f"🏠 家到着: {reach_home}")
 
-            # 直接ToDoアプリを起動する案内
-            st.markdown(f"コピー用： `{pickup_time} バスお迎え`")
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.link_button("🍎 iPhoneリマインダー", "x-apple-reminder://")
-            with col_b:
-                st.link_button("💙 Google Tasks", "https://tasks.google.com/")
+            # Google Tasks一本に絞る
+            st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
 
 with main_tab3:
     sub_tab1, sub_tab2 = st.tabs(["🏫 行き", "🏠 帰り"])
