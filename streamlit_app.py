@@ -106,14 +106,7 @@ with main_tab1:
     h1 = c1.selectbox("時", HOUR_CHOICES, index=default_h_idx, key="h1")
     m1 = c2.selectbox("分", range(0, 60, 5), index=0, key="m1")
     
-    # 手書き指示通りのレイアウト
-    row1_c1, row1_c2 = st.columns(2)
-    if row1_c1.button("⬅️ 前", key="p1", use_container_width=True): st.session_state.off_行き -= 1
-    if row1_c2.button("次 ➡️", key="n1", use_container_width=True): st.session_state.off_行き += 1
-    
-    _, row2_c2, _ = st.columns([1, 2, 1])
-    if row2_c2.button("リセット", key="r1", use_container_width=True): st.session_state.off_行き = 0
-
+    # 1. まず計算結果を表示
     bus = get_offset_bus(BUS_DATA[day_type]["行き"], h1, m1, True, st.session_state.off_行き)
     if bus:
         leave_time = (bus - timedelta(minutes=WALK_HOME_TO_STOP)).strftime('%H:%M')
@@ -127,6 +120,15 @@ with main_tab1:
             info_txt += f"\n\n({'前のバス' if st.session_state.off_行き < 0 else '次のバス'}を表示中)"
         st.info(info_txt)
 
+        # 2. 結果の下に前後ボタンを配置
+        row1_c1, row1_c2 = st.columns(2)
+        if row1_c1.button("⬅️ 前", key="p1", use_container_width=True): st.session_state.off_行き -= 1
+        if row1_c2.button("次 ➡️", key="n1", use_container_width=True): st.session_state.off_行き += 1
+        
+        _, row2_c2, _ = st.columns([1, 2, 1])
+        if row2_c2.button("リセット", key="r1", use_container_width=True): st.session_state.off_行き = 0
+
+        # 3. 最後にリンク・コピーボタン
         st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
         copy_button_html(f"{leave_time} 出発！\\nバス: {bus_time}", "コピー")
 
@@ -136,13 +138,7 @@ with main_tab2:
     h2 = c1.selectbox("時", HOUR_CHOICES, index=default_h_idx, key="h2")
     m2 = c2.selectbox("分", range(0, 60, 5), index=0, key="m2")
     
-    row1_c1, row1_c2 = st.columns(2)
-    if row1_c1.button("⬅️ 前", key="p2", use_container_width=True): st.session_state.off_帰り -= 1
-    if row1_c2.button("次 ➡️", key="n2", use_container_width=True): st.session_state.off_帰り += 1
-    
-    _, row2_c2, _ = st.columns([1, 2, 1])
-    if row2_c2.button("リセット", key="r2", use_container_width=True): st.session_state.off_帰り = 0
-
+    # 1. まず計算結果を表示
     bus = get_offset_bus(BUS_DATA[day_type]["帰り"], h2, m2, False, st.session_state.off_帰り)
     if bus:
         bus_time = bus.strftime('%H:%M')
@@ -154,6 +150,15 @@ with main_tab2:
             warn_txt += f" ({'前' if st.session_state.off_帰り < 0 else '次'}のバス)"
         st.warning(warn_txt)
         
+        # 2. 結果の下に前後ボタンを配置
+        row1_c1, row1_c2 = st.columns(2)
+        if row1_c1.button("⬅️ 前", key="p2", use_container_width=True): st.session_state.off_帰り -= 1
+        if row1_c2.button("次 ➡️", key="n2", use_container_width=True): st.session_state.off_帰り += 1
+        
+        _, row2_c2, _ = st.columns([1, 2, 1])
+        if row2_c2.button("リセット", key="r2", use_container_width=True): st.session_state.off_帰り = 0
+
+        # 3. 最後にリンク・コピーボタン
         st.link_button("💙 Google Tasks を開く", "https://tasks.google.com/", use_container_width=True)
         copy_button_html(f"{bus_time} バス\\n{pick_time} お迎え", "コピー")
 
